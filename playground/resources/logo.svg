@@ -1,0 +1,31 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blue-grad" x1="20" y1="20" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- Main Hexagon/Cube Shape -->
+  <path d="M100 25 L169.28 65 V145 L100 185 L30.72 145 V65 L100 25Z" fill="url(#blue-grad)" stroke="white" stroke-width="2"/>
+  
+  <!-- Inner Cube Lines (Y shape) -->
+  <path d="M100 100 L100 185 M100 100 L169.28 65 M100 100 L30.72 65" stroke="white" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Binary/Hash Data Dots on Left Face -->
+  <g fill="white" opacity="0.6">
+    <circle cx="55" cy="90" r="3"/>
+    <circle cx="70" cy="82" r="3"/>
+    <circle cx="85" cy="74" r="3"/>
+    <circle cx="55" cy="110" r="3"/>
+    <circle cx="70" cy="102" r="3"/>
+    <circle cx="40" cy="100" r="3"/>
+  </g>
+  
+  <!-- Checkmark for Verification/Trust on Right Face -->
+  <path d="M120 115 L135 130 L160 95" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+</svg>

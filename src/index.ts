@@ -60,8 +60,20 @@ export function cidVitePlugin(): Plugin {
                 visit(fileName);
             }
 
-            // Process in order (leaves first)
+            // Separate manifest files from regular files
+            const manifestFiles: string[] = [];
+            const regularFiles: string[] = [];
+
             for (const fileName of sorted) {
+                if (fileName.endsWith('.json') && (fileName.includes('manifest') || fileName.includes('.vite'))) {
+                    manifestFiles.push(fileName);
+                } else {
+                    regularFiles.push(fileName);
+                }
+            }
+
+            // PASS 1: Process regular files (non-manifest)
+            for (const fileName of regularFiles) {
                 const item = bundle[fileName];
                 let content: string | Uint8Array;
 
@@ -82,52 +94,23 @@ export function cidVitePlugin(): Plugin {
                     // It's a chunk. We need to update its content to replace references to dependencies.
                     let code = item.code;
 
-                    // Replace references
-                    // We iterate over all processed files and check if they are referenced in this chunk.
-                    // Optimization: Only check declared dependencies?
-                    // Yes, but we need to know *how* they are referenced.
-                    // Vite/Rollup replaces imports with relative paths.
-                    // e.g. import ... from './dep-HASH.js'
-
-                    // We can use a simple replace for now, assuming filenames are unique enough.
-                    // We should replace the relative path or just the filename?
-                    // Usually imports are relative.
-
                     for (const [oldName, newName] of fileMap) {
-                        // We need to be careful. 
-                        // If oldName is "assets/foo.js", and code has "./foo.js" (if in same dir) or "foo.js".
-                        // Vite usually outputs flat or nested structure.
-                        // Let's assume we replace the basename if it matches? 
-                        // Or better, we know the exact string Vite uses?
-                        // Actually, we can just replace the `oldName` string if it appears?
-                        // But `oldName` is the key in bundle, e.g. "assets/index-123.js".
-                        // The code might contain "./index-123.js".
-
-                        // A safer approach:
-                        // 1. Get the relative path from current file to the dependency.
-                        // 2. Replace that relative path with the new relative path.
-
-                        // However, we don't know exactly how it's written in the code (quotes, etc).
-                        // But we can try to replace the filename part.
-
-                        // Let's try global replace of the filename.
-                        // This is risky if filename is "index.js".
-                        // But with Vite hashing, it's usually "index-HASH.js".
-
-                        // Let's try to be smarter.
-                        // We can iterate over imports and see what they resolve to?
-                        // But `item.imports` gives us the bundle key of the import.
-                        // So we know `dep` is imported.
-                        // We can try to replace `basename(dep)` with `basename(newName)`.
-
                         const oldBase = path.basename(oldName);
                         const newBase = path.basename(newName);
-
-                        // Escape for regex
                         const escapedOldBase = oldBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                         const regex = new RegExp(escapedOldBase, 'g');
-
                         code = code.replace(regex, newBase);
+                    }
+
+                    // Handle source map references
+                    if (item.map) {
+                        // Update sourceMappingURL comment
+                        const mapFileName = `${fileName}.map`;
+                        if (bundle[mapFileName]) {
+                            const oldMapBase = path.basename(mapFileName);
+                            // The new map filename will be determined after we process it
+                            // For now, just note that we need to update this later
+                        }
                     }
 
                     item.code = code;
@@ -138,7 +121,12 @@ export function cidVitePlugin(): Plugin {
                 const cid = await generateCID(content);
 
                 // Construct new filename
-                // Keep the extension
+                // Skip renaming HTML files so they can be served by web servers/vite preview
+                // This supports MPA (Multi-Page App) setups where entry points must be preserved
+                if (fileName.endsWith('.html')) {
+                    continue;
+                }
+
                 const ext = path.extname(fileName);
                 const dir = path.dirname(fileName);
                 const newFileName = path.join(dir, `${cid}${ext}`);
@@ -150,6 +138,131 @@ export function cidVitePlugin(): Plugin {
                     bundle[newFileName] = item;
 
                     fileMap.set(fileName, newFileName);
+                }
+            }
+
+            // PASS 1.5: Update sourceMappingURL comments now that we know all the new filenames
+            for (const [oldName, newName] of fileMap) {
+                if (oldName.endsWith('.map')) {
+                    // This is a source map file, find the corresponding JS/CSS file
+                    const sourceFile = oldName.replace(/\.map$/, '');
+                    const newSourceFile = fileMap.get(sourceFile);
+
+                    if (newSourceFile && bundle[newSourceFile]) {
+                        const item = bundle[newSourceFile];
+                        if (item.type === 'chunk') {
+                            // Update sourceMappingURL comment
+                            const oldMapBase = path.basename(oldName);
+                            const newMapBase = path.basename(newName);
+                            const escapedOldMapBase = oldMapBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                            const regex = new RegExp(escapedOldMapBase, 'g');
+                            item.code = item.code.replace(regex, newMapBase);
+                        }
+                    }
+                }
+            }
+
+            // PASS 2: Process manifest files with updated fileMap
+            for (const fileName of manifestFiles) {
+                const item = bundle[fileName];
+                if (item.type !== 'asset') continue;
+
+                let content = item.source;
+                if (typeof content !== 'string') continue;
+
+                // Update JSON manifest files
+                try {
+                    const manifest = JSON.parse(content);
+                    // Update file references in the manifest
+                    for (const [oldName, newName] of fileMap) {
+                        // Escape for regex
+                        const escapedOldName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(escapedOldName, 'g');
+
+                        // Convert manifest to string, replace full paths, and parse back
+                        const manifestStr = JSON.stringify(manifest);
+                        const updatedStr = manifestStr.replace(regex, newName);
+                        Object.assign(manifest, JSON.parse(updatedStr));
+                    }
+                    content = JSON.stringify(manifest, null, 2);
+                } catch (e) {
+                    // If JSON parsing fails, fall back to string replacement
+                    for (const [oldName, newName] of fileMap) {
+                        const escapedOldName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(escapedOldName, 'g');
+                        content = content.replace(regex, newName);
+                    }
+                }
+
+                item.source = content;
+
+                // Generate CID for manifest file
+                const cid = await generateCID(content);
+                const ext = path.extname(fileName);
+                const dir = path.dirname(fileName);
+                const newFileName = path.join(dir, `${cid}${ext}`);
+
+                if (newFileName !== fileName) {
+                    item.fileName = newFileName;
+                    delete bundle[fileName];
+                    bundle[newFileName] = item;
+                    fileMap.set(fileName, newFileName);
+                }
+            }
+        },
+
+        // Update manifest files after they're written
+        async writeBundle(options, bundle) {
+            const fs = await import('node:fs/promises');
+            const outDir = options.dir || 'dist';
+
+            // Find and update manifest files
+            for (const fileName of Object.keys(bundle)) {
+                if (!fileName.endsWith('.json')) continue;
+                if (!(fileName.includes('manifest') || fileName.includes('.vite'))) continue;
+
+                const filePath = path.join(outDir, fileName);
+
+                try {
+                    // Read the manifest file
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    const manifest = JSON.parse(content);
+                    let updated = false;
+
+                    // Find all CID-named files and update references
+                    for (const bundleFileName of Object.keys(bundle)) {
+                        const basename = path.basename(bundleFileName, path.extname(bundleFileName));
+                        if (basename.startsWith('bafkrei')) {
+                            // This is a CID-named file
+                            const dir = path.dirname(bundleFileName);
+                            const ext = path.extname(bundleFileName);
+
+                            // Look for old-style Vite hashed filenames in manifest
+                            const manifestStr = JSON.stringify(manifest);
+                            const pattern = new RegExp(`"(${dir}/[^"]+${ext.replace('.', '\\.')})"`, 'g');
+                            const matches = manifestStr.match(pattern);
+
+                            if (matches) {
+                                for (const match of matches) {
+                                    const oldPath = match.slice(1, -1);
+                                    // If this path doesn't exist in bundle, it was renamed
+                                    if (!bundle[oldPath] && oldPath !== bundleFileName) {
+                                        const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                        const regex = new RegExp(escapedOldPath, 'g');
+                                        const updatedStr = JSON.stringify(manifest).replace(regex, bundleFileName);
+                                        Object.assign(manifest, JSON.parse(updatedStr));
+                                        updated = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (updated) {
+                        await fs.writeFile(filePath, JSON.stringify(manifest, null, 2));
+                    }
+                } catch (e) {
+                    // Ignore errors
                 }
             }
         }

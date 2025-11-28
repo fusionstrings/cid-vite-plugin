@@ -88,15 +88,13 @@ describe('cidVitePlugin', () => {
         }
 
         // Verify HTML CID and references
-        const htmlFile = filePaths.find(f => f.endsWith('.html')); // index.html might be renamed?
-        // If index.html is an asset, it should be renamed too!
-        // But usually index.html is the entry point.
-        // If it's renamed, we need to find it.
+        // index.html should NOT be renamed so it can be served
+        const indexHtmlPath = path.join(distDir, 'index.html');
+        const indexHtmlExists = await fs.stat(indexHtmlPath).then(() => true).catch(() => false);
+        expect(indexHtmlExists).toBe(true);
 
-        // Let's find the HTML file
-        expect(htmlFile).toBeDefined();
-        if (htmlFile) {
-            const content = await fs.readFile(path.join(distDir, htmlFile), 'utf-8');
+        if (indexHtmlExists) {
+            const content = await fs.readFile(indexHtmlPath, 'utf-8');
             // It should reference the JS and CSS files by their new names
             if (jsFile) expect(content).toContain(jsFile);
             if (cssFile) expect(content).toContain(cssFile);

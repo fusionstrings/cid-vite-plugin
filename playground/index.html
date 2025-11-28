@@ -1,15 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CID Vite Plugin Example</title>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="app">
-      <h1>Hello CID!</h1>
-      <img id="logo" src="./assets/logo.svg" alt="Logo" />
+        <header>
+            <img id="logo" src="/resources/logo.svg" alt="CID Vite Plugin Logo" />
+            <h1>CID Vite Plugin</h1>
+            <p class="subtitle">Immutable Builds for the Decentralized Web</p>
+        </header>
+
+        <main>
+            <div class="features">
+                <div class="feature-card">
+                    <div class="icon">🔒</div>
+                    <h3>Content Addressed</h3>
+                    <p>Files are named by their content hash (CID), ensuring true immutability.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">⚡️</div>
+                    <h3>Vite Powered</h3>
+                    <p>Seamless integration with Vite's build pipeline and development server.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon">📦</div>
+                    <h3>IPFS Ready</h3>
+                    <p>Perfect for deploying to IPFS, Arweave, or any content-addressed storage.</p>
+                </div>
+            </div>
+
+            <div class="demo-section">
+                <h2>Live Demo</h2>
+                <p>This page is being served with CID-based filenames.</p>
+                <div id="cid-display" class="code-block">Loading CID info...</div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Generated with <a href="https://github.com/fusionstrings/cid-vite-plugin"
+                    target="_blank">cid-vite-plugin</a></p>
+        </footer>
     </div>
     <script type="module" src="./src/main.ts"></script>
-  </body>
+</body>
+
 </html>
