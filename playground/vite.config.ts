@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
-import { cidVitePlugin } from "../src/index.ts";
+import { cid } from "../src/index.ts";
 
 export default defineConfig({
 	root: __dirname,
 	plugins: [
-		cidVitePlugin(),
+		cid(),
 	],
 	build: {
 		outDir: "dist",

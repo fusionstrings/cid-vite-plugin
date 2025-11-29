@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { build } from "vite";
-import { cidVitePlugin } from "./index.ts";
+import { cid } from "./index.ts";
 import * as path from "@std/path";
 import { fromFileUrl } from "@std/path";
 import { generateCID } from "./cid.ts";
@@ -20,7 +20,7 @@ async function* walkDir(dir: string, base = dir): AsyncGenerator<string> {
 }
 
 Deno.test({
-	name: "cidVitePlugin - should rename files to their CIDs",
+	name: "cid - should rename files to their CIDs",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -60,7 +60,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false, // Easier to debug/verify

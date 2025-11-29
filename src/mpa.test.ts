@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import { build } from "vite";
-import { cidVitePlugin } from "./index.ts";
+import { cid } from "./index.ts";
 import * as path from "@std/path";
 import { fromFileUrl } from "@std/path";
 
@@ -20,7 +20,7 @@ async function* walkDir(dir: string, base = dir): AsyncGenerator<string> {
 
 Deno.test({
 	name:
-		"cidVitePlugin - MPA Support - should preserve filenames for all HTML entry points",
+		"cid - MPA Support - should preserve filenames for all HTML entry points",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -66,7 +66,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false,

@@ -1,6 +1,6 @@
 import { assert, assertMatch } from "@std/assert";
 import { build } from "vite";
-import { cidVitePlugin } from "./index.ts";
+import { cid } from "./index.ts";
 import * as path from "@std/path";
 import { fromFileUrl } from "@std/path";
 
@@ -19,7 +19,7 @@ async function* walkDir(dir: string, base = dir): AsyncGenerator<string> {
 }
 
 Deno.test({
-	name: "cidVitePlugin - should handle duplicate content (CID collision)",
+	name: "cid - should handle duplicate content (CID collision)",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -52,7 +52,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false,
@@ -85,7 +85,7 @@ Deno.test({
 });
 
 Deno.test({
-	name: "cidVitePlugin - should handle CSS with url() references",
+	name: "cid - should handle CSS with url() references",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -125,7 +125,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false,
@@ -162,7 +162,7 @@ Deno.test({
 });
 
 Deno.test({
-	name: "cidVitePlugin - should handle empty files",
+	name: "cid - should handle empty files",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -186,7 +186,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false,
@@ -208,7 +208,7 @@ Deno.test({
 });
 
 Deno.test({
-	name: "cidVitePlugin - should handle source maps when enabled",
+	name: "cid - should handle source maps when enabled",
 	sanitizeResources: false,
 	sanitizeOps: false,
 	async fn() {
@@ -237,7 +237,7 @@ Deno.test({
 			await build({
 				root: tempDir,
 				logLevel: "silent",
-				plugins: [cidVitePlugin()],
+				plugins: [cid()],
 				build: {
 					outDir: "dist",
 					minify: false,

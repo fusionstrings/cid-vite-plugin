@@ -25,10 +25,10 @@
  *
  * ```typescript
  * import { defineConfig } from 'vite';
- * import { cidVitePlugin } from '@fusionstrings/vite-plugin-cid';
+ * import { cid } from '@fusionstrings/vite-plugin-cid';
  *
  * export default defineConfig({
- *   plugins: [cidVitePlugin()],
+ *   plugins: [cid()],
  * });
  * ```
  *
@@ -74,7 +74,7 @@ interface ViteOutputChunk extends OutputChunk {
  *
  * @public
  */
-export function cidVitePlugin(): Plugin {
+export function cid(): Plugin {
 	return {
 		name: "vite-plugin-cid",
 		enforce: "post",

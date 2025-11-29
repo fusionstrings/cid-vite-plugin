@@ -26,7 +26,7 @@ deployment.
 ### Deno (JSR)
 
 ```typescript
-import { cidVitePlugin } from "jsr:@fusionstrings/vite-plugin-cid";
+import { cid } from "jsr:@fusionstrings/vite-plugin-cid";
 ```
 
 ### Node.js (npm/pnpm/yarn)
@@ -48,11 +48,11 @@ Add the plugin to your `vite.config.ts`:
 
 ```typescript
 import { defineConfig } from "vite";
-import { cidVitePlugin } from "@fusionstrings/vite-plugin-cid";
+import { cid } from "@fusionstrings/vite-plugin-cid";
 
 export default defineConfig({
 	plugins: [
-		cidVitePlugin(),
+		cid(),
 	],
 	build: {
 		manifest: true, // Optional: Generate manifest file
