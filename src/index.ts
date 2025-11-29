@@ -1,54 +1,188 @@
-import { type Plugin } from 'vite';
-import { type OutputBundle, type OutputChunk, type OutputAsset } from 'rollup';
-import { generateCID } from './cid.js';
-import path from 'node:path';
+/**
+ * # CID Vite Plugin
+ *
+ * A Vite plugin that renames build outputs using Content Identifiers (CID).
+ *
+ * This package provides a Vite plugin that transforms build output filenames into
+ * content-addressed CIDs, making them compatible with IPFS and other decentralized
+ * storage systems.
+ *
+ * ## Features
+ *
+ * - **Content-Addressed Naming**: All build outputs are renamed using CIDv1 (SHA-256, base32)
+ * - **Automatic Reference Updates**: All internal references are updated to use new CID filenames
+ * - **Manifest Support**: Vite manifest files are updated with new filenames
+ * - **HTML Preservation**: HTML entry points keep original names for web server compatibility
+ * - **Topological Processing**: Files are processed in dependency order to ensure correct references
+ *
+ * ## Installation
+ *
+ * ```bash
+ * # Using Deno
+ * deno add jsr:@fusionstrings/cid-vite-plugin
+ *
+ * # Using npm
+ * npx jsr add @fusionstrings/cid-vite-plugin
+ * ```
+ *
+ * ## Quick Start
+ *
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+ *
+ * export default defineConfig({
+ *   plugins: [cidVitePlugin()],
+ * });
+ * ```
+ *
+ * ## IPFS Deployment
+ *
+ * For IPFS deployment, use relative paths:
+ *
+ * ```typescript
+ * export default defineConfig({
+ *   base: './',
+ *   build: { manifest: true },
+ *   plugins: [cidVitePlugin()],
+ * });
+ * ```
+ *
+ * @module
+ */
 
+import type { Plugin } from 'vite';
+import type { OutputBundle, OutputChunk } from 'rollup';
+import { generateCID } from './cid.ts';
+import * as path from '@std/path';
+
+/**
+ * Extended OutputChunk with Vite-specific metadata.
+ * @internal
+ */
+interface ViteOutputChunk extends OutputChunk {
+    viteMetadata?: {
+        importedAssets: Set<string>;
+        importedCss: Set<string>;
+    };
+}
+
+/**
+ * Creates a Vite plugin that renames build output files using Content Identifiers (CID).
+ *
+ * The plugin hooks into Vite's build process to rename all generated assets
+ * (JavaScript, CSS, images, etc.) with content-addressed CID hashes derived from
+ * SHA-256 and encoded in base32 format.
+ *
+ * @remarks
+ * The plugin operates in two phases:
+ *
+ * 1. **generateBundle**: Processes files in topological order, generates CIDs,
+ *    renames files, and updates all references.
+ *
+ * 2. **writeBundle**: Performs final updates to manifest files on disk.
+ *
+ * Key behaviors:
+ * - HTML files retain original names for web server compatibility
+ * - Manifest files are processed last to capture all renames
+ * - Circular dependencies are handled gracefully
+ * - Source map references are updated automatically
+ *
+ * @returns A Vite {@link https://vitejs.dev/guide/api-plugin.html | Plugin} instance
+ *
+ * @example Basic usage
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+ *
+ * export default defineConfig({
+ *   plugins: [cidVitePlugin()],
+ * });
+ * ```
+ *
+ * @example With other plugins
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import react from '@vitejs/plugin-react';
+ * import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+ *
+ * export default defineConfig({
+ *   plugins: [react(), cidVitePlugin()],
+ * });
+ * ```
+ *
+ * @example Multi-page application
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+ *
+ * export default defineConfig({
+ *   build: {
+ *     rollupOptions: {
+ *       input: {
+ *         main: 'index.html',
+ *         admin: 'admin.html',
+ *       },
+ *     },
+ *   },
+ *   plugins: [cidVitePlugin()],
+ * });
+ * ```
+ *
+ * @example IPFS deployment configuration
+ * ```typescript
+ * import { defineConfig } from 'vite';
+ * import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+ *
+ * export default defineConfig({
+ *   base: './',
+ *   build: {
+ *     manifest: true,
+ *   },
+ *   plugins: [cidVitePlugin()],
+ * });
+ * ```
+ *
+ * @see {@link generateCID} for the underlying CID generation function
+ * @see {@link https://docs.ipfs.tech/concepts/content-addressing/ | IPFS Content Addressing}
+ *
+ * @public
+ */
 export function cidVitePlugin(): Plugin {
     return {
         name: 'vite-plugin-cid',
-        enforce: 'post', // Run after other plugins
+        enforce: 'post',
         apply: 'build',
 
-        async generateBundle(options, bundle) {
-            const processed = new Set<string>();
-            const fileMap = new Map<string, string>(); // oldFileName -> newCIDFileName
+        async generateBundle(_options, bundle: OutputBundle) {
+            const fileMap = new Map<string, string>();
 
-            // Helper to get dependencies of a file
             const getDeps = (fileName: string): string[] => {
                 const chunk = bundle[fileName];
                 if (!chunk) return [];
                 if (chunk.type === 'asset') return [];
 
-                // For chunks, dependencies are imports, dynamicImports, and referencedFiles
-                // Note: referencedFiles are usually assets
+                const viteChunk = chunk as ViteOutputChunk;
                 return [
                     ...chunk.imports,
                     ...chunk.dynamicImports,
-                    ...chunk.viteMetadata?.importedAssets || [],
-                    ...chunk.viteMetadata?.importedCss || []
+                    ...viteChunk.viteMetadata?.importedAssets || [],
+                    ...viteChunk.viteMetadata?.importedCss || []
                 ];
             };
 
-            // Topological sort (DFS)
+            // Topological sort using DFS
             const sorted: string[] = [];
             const visited = new Set<string>();
             const visiting = new Set<string>();
 
             const visit = (fileName: string) => {
                 if (visited.has(fileName)) return;
-                if (visiting.has(fileName)) {
-                    // Cycle detected. In a real app, we might need to handle circular deps.
-                    // For now, we'll just break the cycle and proceed.
-                    return;
-                }
+                if (visiting.has(fileName)) return; // Break cycles
                 visiting.add(fileName);
 
-                const deps = getDeps(fileName);
-                for (const dep of deps) {
-                    // Dep might not be in the bundle (external)
-                    if (bundle[dep]) {
-                        visit(dep);
-                    }
+                for (const dep of getDeps(fileName)) {
+                    if (bundle[dep]) visit(dep);
                 }
 
                 visiting.delete(fileName);
@@ -60,7 +194,7 @@ export function cidVitePlugin(): Plugin {
                 visit(fileName);
             }
 
-            // Separate manifest files from regular files
+            // Separate manifest files for last-pass processing
             const manifestFiles: string[] = [];
             const regularFiles: string[] = [];
 
@@ -72,7 +206,7 @@ export function cidVitePlugin(): Plugin {
                 }
             }
 
-            // PASS 1: Process regular files (non-manifest)
+            // Process regular files
             for (const fileName of regularFiles) {
                 const item = bundle[fileName];
                 let content: string | Uint8Array;
@@ -80,89 +214,63 @@ export function cidVitePlugin(): Plugin {
                 if (item.type === 'asset') {
                     content = item.source;
                     if (typeof content === 'string') {
-                        // Update asset content (e.g. HTML)
                         for (const [oldName, newName] of fileMap) {
                             const oldBase = path.basename(oldName);
                             const newBase = path.basename(newName);
                             const escapedOldBase = oldBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            const regex = new RegExp(escapedOldBase, 'g');
-                            content = content.replace(regex, newBase);
+                            content = content.replace(new RegExp(escapedOldBase, 'g'), newBase);
                         }
                         item.source = content;
                     }
                 } else {
-                    // It's a chunk. We need to update its content to replace references to dependencies.
                     let code = item.code;
 
                     for (const [oldName, newName] of fileMap) {
                         const oldBase = path.basename(oldName);
                         const newBase = path.basename(newName);
                         const escapedOldBase = oldBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp(escapedOldBase, 'g');
-                        code = code.replace(regex, newBase);
-                    }
-
-                    // Handle source map references
-                    if (item.map) {
-                        // Update sourceMappingURL comment
-                        const mapFileName = `${fileName}.map`;
-                        if (bundle[mapFileName]) {
-                            const oldMapBase = path.basename(mapFileName);
-                            // The new map filename will be determined after we process it
-                            // For now, just note that we need to update this later
-                        }
+                        code = code.replace(new RegExp(escapedOldBase, 'g'), newBase);
                     }
 
                     item.code = code;
                     content = code;
                 }
 
-                // Generate CID
+                // Skip HTML files to preserve entry points
+                if (fileName.endsWith('.html')) continue;
+
                 const cid = await generateCID(content);
-
-                // Construct new filename
-                // Skip renaming HTML files so they can be served by web servers/vite preview
-                // This supports MPA (Multi-Page App) setups where entry points must be preserved
-                if (fileName.endsWith('.html')) {
-                    continue;
-                }
-
                 const ext = path.extname(fileName);
                 const dir = path.dirname(fileName);
                 const newFileName = path.join(dir, `${cid}${ext}`);
 
                 if (newFileName !== fileName) {
-                    // Update bundle
                     item.fileName = newFileName;
                     delete bundle[fileName];
                     bundle[newFileName] = item;
-
                     fileMap.set(fileName, newFileName);
                 }
             }
 
-            // PASS 1.5: Update sourceMappingURL comments now that we know all the new filenames
+            // Update source map references
             for (const [oldName, newName] of fileMap) {
                 if (oldName.endsWith('.map')) {
-                    // This is a source map file, find the corresponding JS/CSS file
                     const sourceFile = oldName.replace(/\.map$/, '');
                     const newSourceFile = fileMap.get(sourceFile);
 
                     if (newSourceFile && bundle[newSourceFile]) {
                         const item = bundle[newSourceFile];
                         if (item.type === 'chunk') {
-                            // Update sourceMappingURL comment
                             const oldMapBase = path.basename(oldName);
                             const newMapBase = path.basename(newName);
                             const escapedOldMapBase = oldMapBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                            const regex = new RegExp(escapedOldMapBase, 'g');
-                            item.code = item.code.replace(regex, newMapBase);
+                            item.code = item.code.replace(new RegExp(escapedOldMapBase, 'g'), newMapBase);
                         }
                     }
                 }
             }
 
-            // PASS 2: Process manifest files with updated fileMap
+            // Process manifest files
             for (const fileName of manifestFiles) {
                 const item = bundle[fileName];
                 if (item.type !== 'asset') continue;
@@ -170,33 +278,24 @@ export function cidVitePlugin(): Plugin {
                 let content = item.source;
                 if (typeof content !== 'string') continue;
 
-                // Update JSON manifest files
                 try {
                     const manifest = JSON.parse(content);
-                    // Update file references in the manifest
                     for (const [oldName, newName] of fileMap) {
-                        // Escape for regex
                         const escapedOldName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp(escapedOldName, 'g');
-
-                        // Convert manifest to string, replace full paths, and parse back
                         const manifestStr = JSON.stringify(manifest);
-                        const updatedStr = manifestStr.replace(regex, newName);
+                        const updatedStr = manifestStr.replace(new RegExp(escapedOldName, 'g'), newName);
                         Object.assign(manifest, JSON.parse(updatedStr));
                     }
                     content = JSON.stringify(manifest, null, 2);
-                } catch (e) {
-                    // If JSON parsing fails, fall back to string replacement
+                } catch {
                     for (const [oldName, newName] of fileMap) {
                         const escapedOldName = oldName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp(escapedOldName, 'g');
-                        content = content.replace(regex, newName);
+                        content = content.replace(new RegExp(escapedOldName, 'g'), newName);
                     }
                 }
 
                 item.source = content;
 
-                // Generate CID for manifest file
                 const cid = await generateCID(content);
                 const ext = path.extname(fileName);
                 const dir = path.dirname(fileName);
@@ -211,12 +310,10 @@ export function cidVitePlugin(): Plugin {
             }
         },
 
-        // Update manifest files after they're written
         async writeBundle(options, bundle) {
             const fs = await import('node:fs/promises');
             const outDir = options.dir || 'dist';
 
-            // Find and update manifest files
             for (const fileName of Object.keys(bundle)) {
                 if (!fileName.endsWith('.json')) continue;
                 if (!(fileName.includes('manifest') || fileName.includes('.vite'))) continue;
@@ -224,20 +321,16 @@ export function cidVitePlugin(): Plugin {
                 const filePath = path.join(outDir, fileName);
 
                 try {
-                    // Read the manifest file
                     const content = await fs.readFile(filePath, 'utf-8');
                     const manifest = JSON.parse(content);
                     let updated = false;
 
-                    // Find all CID-named files and update references
                     for (const bundleFileName of Object.keys(bundle)) {
                         const basename = path.basename(bundleFileName, path.extname(bundleFileName));
                         if (basename.startsWith('bafkrei')) {
-                            // This is a CID-named file
                             const dir = path.dirname(bundleFileName);
                             const ext = path.extname(bundleFileName);
 
-                            // Look for old-style Vite hashed filenames in manifest
                             const manifestStr = JSON.stringify(manifest);
                             const pattern = new RegExp(`"(${dir}/[^"]+${ext.replace('.', '\\.')})"`, 'g');
                             const matches = manifestStr.match(pattern);
@@ -245,11 +338,9 @@ export function cidVitePlugin(): Plugin {
                             if (matches) {
                                 for (const match of matches) {
                                     const oldPath = match.slice(1, -1);
-                                    // If this path doesn't exist in bundle, it was renamed
                                     if (!bundle[oldPath] && oldPath !== bundleFileName) {
                                         const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                        const regex = new RegExp(escapedOldPath, 'g');
-                                        const updatedStr = JSON.stringify(manifest).replace(regex, bundleFileName);
+                                        const updatedStr = JSON.stringify(manifest).replace(new RegExp(escapedOldPath, 'g'), bundleFileName);
                                         Object.assign(manifest, JSON.parse(updatedStr));
                                         updated = true;
                                     }
@@ -261,7 +352,7 @@ export function cidVitePlugin(): Plugin {
                     if (updated) {
                         await fs.writeFile(filePath, JSON.stringify(manifest, null, 2));
                     }
-                } catch (e) {
+                } catch {
                     // Ignore errors
                 }
             }

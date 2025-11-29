@@ -1,19 +1,33 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { assertEquals, assert } from '@std/assert';
 import { build } from 'vite';
-import { cidVitePlugin } from './index.js';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { generateCID } from './cid.js';
+import { cidVitePlugin } from './index.ts';
+import * as path from '@std/path';
+import { fromFileUrl } from '@std/path';
+import { generateCID } from './cid.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fromFileUrl(import.meta.url));
 const tempDir = path.join(__dirname, '../temp-test');
 
-describe('cidVitePlugin', () => {
-    beforeAll(async () => {
-        await fs.mkdir(tempDir, { recursive: true });
+async function* walkDir(dir: string, base = dir): AsyncGenerator<string> {
+    for await (const entry of Deno.readDir(dir)) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory) {
+            yield* walkDir(fullPath, base);
+        } else {
+            yield path.relative(base, fullPath);
+        }
+    }
+}
+
+Deno.test({
+    name: 'cidVitePlugin - should rename files to their CIDs',
+    sanitizeResources: false,
+    sanitizeOps: false,
+    async fn() {
+        await Deno.mkdir(tempDir, { recursive: true });
+        
         // Create a simple app
-        await fs.writeFile(path.join(tempDir, 'index.html'), `
+        await Deno.writeTextFile(path.join(tempDir, 'index.html'), `
       <!DOCTYPE html>
       <html>
         <head>
@@ -25,79 +39,66 @@ describe('cidVitePlugin', () => {
         </body>
       </html>
     `);
-        await fs.writeFile(path.join(tempDir, 'main.js'), `
+        await Deno.writeTextFile(path.join(tempDir, 'main.js'), `
       import './style.css';
       console.log('main');
     `);
-        await fs.writeFile(path.join(tempDir, 'style.css'), `
+        await Deno.writeTextFile(path.join(tempDir, 'style.css'), `
       body { color: red; }
     `);
-    });
 
-    afterAll(async () => {
-        await fs.rm(tempDir, { recursive: true, force: true });
-    });
+        try {
+            await build({
+                root: tempDir,
+                logLevel: 'silent',
+                plugins: [cidVitePlugin()],
+                build: {
+                    outDir: 'dist',
+                    minify: false, // Easier to debug/verify
+                    emptyOutDir: true,
+                },
+            });
 
-    it('should rename files to their CIDs', async () => {
-        await build({
-            root: tempDir,
-            logLevel: 'silent',
-            plugins: [cidVitePlugin()],
-            build: {
-                outDir: 'dist',
-                minify: false, // Easier to debug/verify
-                emptyOutDir: true,
-            },
-        });
+            const distDir = path.join(tempDir, 'dist');
+            const files = [];
+            for await (const name of walkDir(distDir)) {
+                files.push(name);
+            }
 
-        const distDir = path.join(tempDir, 'dist');
-        const files = await fs.readdir(distDir, { recursive: true });
+            const cssFile = files.find(f => f.endsWith('.css'));
+            const jsFile = files.find(f => f.endsWith('.js'));
 
-        // Filter out directories
-        const filePaths = [];
-        for (const f of files) {
-            const stat = await fs.stat(path.join(distDir, f));
-            if (stat.isFile()) filePaths.push(f);
+            assert(cssFile !== undefined, 'CSS file should exist');
+            assert(jsFile !== undefined, 'JS file should exist');
+
+            // Verify CSS CID
+            if (cssFile) {
+                const content = await Deno.readFile(path.join(distDir, cssFile));
+                const expectedCid = await generateCID(content);
+                assert(cssFile.includes(expectedCid), `CSS file should contain CID ${expectedCid}`);
+            }
+
+            // Verify JS CID
+            if (jsFile) {
+                const content = await Deno.readFile(path.join(distDir, jsFile));
+                const expectedCid = await generateCID(content);
+                assert(jsFile.includes(expectedCid), `JS file should contain CID ${expectedCid}`);
+            }
+
+            // Verify HTML CID and references
+            // index.html should NOT be renamed so it can be served
+            const indexHtmlPath = path.join(distDir, 'index.html');
+            const indexHtmlExists = await Deno.stat(indexHtmlPath).then(() => true).catch(() => false);
+            assertEquals(indexHtmlExists, true);
+
+            if (indexHtmlExists) {
+                const content = await Deno.readTextFile(indexHtmlPath);
+                // It should reference the JS and CSS files by their new names
+                if (jsFile) assert(content.includes(jsFile), 'HTML should reference JS file');
+                if (cssFile) assert(content.includes(cssFile), 'HTML should reference CSS file');
+            }
+        } finally {
+            await Deno.remove(tempDir, { recursive: true }).catch(() => {});
         }
-
-        // Expect index.html, and assets
-        // The assets should have CID names.
-        // Note: index.html is usually an entry point and might not be renamed by default in some setups, 
-        // but for a pure static site it might be. 
-        // However, Vite usually keeps index.html as index.html. 
-        // The assets (js, css) should be renamed.
-
-        const cssFile = filePaths.find(f => f.endsWith('.css'));
-        const jsFile = filePaths.find(f => f.endsWith('.js'));
-
-        expect(cssFile).toBeDefined();
-        expect(jsFile).toBeDefined();
-
-        // Verify CSS CID
-        if (cssFile) {
-            const content = await fs.readFile(path.join(distDir, cssFile));
-            const expectedCid = await generateCID(content);
-            expect(cssFile).toContain(expectedCid);
-        }
-
-        // Verify JS CID
-        if (jsFile) {
-            const content = await fs.readFile(path.join(distDir, jsFile));
-            const expectedCid = await generateCID(content);
-            expect(jsFile).toContain(expectedCid);
-        }
-
-        // Verify HTML CID and references
-        // index.html should NOT be renamed so it can be served
-        const indexHtmlPath = path.join(distDir, 'index.html');
-        const indexHtmlExists = await fs.stat(indexHtmlPath).then(() => true).catch(() => false);
-        expect(indexHtmlExists).toBe(true);
-
-        if (indexHtmlExists) {
-            const content = await fs.readFile(indexHtmlPath, 'utf-8');
-            // It should reference the JS and CSS files by their new names
-            if (jsFile) expect(content).toContain(jsFile);
-            if (cssFile) expect(content).toContain(cssFile);
-        }
-    });
+    },
 });

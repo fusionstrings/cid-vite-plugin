@@ -1,2 +1,19 @@
 node_modules
+# Deno
+.deno
+
+# Build outputs
 dist
+docs
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.wrangler

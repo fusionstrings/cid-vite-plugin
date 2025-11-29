@@ -11,12 +11,5 @@ export default defineConfig({
         manifest: true,
         ssrManifest: true,
         modulePreload: true,
-        rollupOptions: {
-            output: {
-                manualChunks: {
-                    vendor: ['./src/vendor.ts'],
-                },
-            },
-        },
     },
 });

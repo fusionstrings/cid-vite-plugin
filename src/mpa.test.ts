@@ -1,19 +1,33 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { assertEquals, assert, assertMatch } from '@std/assert';
 import { build } from 'vite';
-import { cidVitePlugin } from './index.js';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { cidVitePlugin } from './index.ts';
+import * as path from '@std/path';
+import { fromFileUrl } from '@std/path';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fromFileUrl(import.meta.url));
 const tempDir = path.join(__dirname, '../temp-mpa');
 
-describe('cidVitePlugin - MPA Support', () => {
-    beforeAll(async () => {
-        await fs.mkdir(tempDir, { recursive: true });
+async function* walkDir(dir: string, base = dir): AsyncGenerator<string> {
+    for await (const entry of Deno.readDir(dir)) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory) {
+            yield* walkDir(fullPath, base);
+        } else {
+            yield path.relative(base, fullPath);
+        }
+    }
+}
 
-        // Create index.html
-        await fs.writeFile(path.join(tempDir, 'index.html'), `
+Deno.test({
+    name: 'cidVitePlugin - MPA Support - should preserve filenames for all HTML entry points',
+    sanitizeResources: false,
+    sanitizeOps: false,
+    async fn() {
+        await Deno.mkdir(tempDir, { recursive: true });
+        
+        try {
+            // Create index.html
+            await Deno.writeTextFile(path.join(tempDir, 'index.html'), `
       <!DOCTYPE html>
       <html>
         <head><title>Home</title></head>
@@ -24,8 +38,8 @@ describe('cidVitePlugin - MPA Support', () => {
       </html>
     `);
 
-        // Create about.html
-        await fs.writeFile(path.join(tempDir, 'about.html'), `
+            // Create about.html
+            await Deno.writeTextFile(path.join(tempDir, 'about.html'), `
       <!DOCTYPE html>
       <html>
         <head><title>About</title></head>
@@ -36,47 +50,47 @@ describe('cidVitePlugin - MPA Support', () => {
       </html>
     `);
 
-        // Create main.js
-        await fs.writeFile(path.join(tempDir, 'main.js'), `console.log('main');`);
-    });
+            // Create main.js
+            await Deno.writeTextFile(path.join(tempDir, 'main.js'), `console.log('main');`);
 
-    afterAll(async () => {
-        await fs.rm(tempDir, { recursive: true, force: true });
-    });
-
-    it('should preserve filenames for all HTML entry points', async () => {
-        await build({
-            root: tempDir,
-            logLevel: 'silent',
-            plugins: [cidVitePlugin()],
-            build: {
-                outDir: 'dist',
-                minify: false,
-                emptyOutDir: true,
-                rollupOptions: {
-                    input: {
-                        main: path.join(tempDir, 'index.html'),
-                        about: path.join(tempDir, 'about.html'),
+            await build({
+                root: tempDir,
+                logLevel: 'silent',
+                plugins: [cidVitePlugin()],
+                build: {
+                    outDir: 'dist',
+                    minify: false,
+                    emptyOutDir: true,
+                    rollupOptions: {
+                        input: {
+                            main: path.join(tempDir, 'index.html'),
+                            about: path.join(tempDir, 'about.html'),
+                        },
                     },
                 },
-            },
-        });
+            });
 
-        const distDir = path.join(tempDir, 'dist');
+            const distDir = path.join(tempDir, 'dist');
 
-        // Check that index.html exists
-        const indexExists = await fs.stat(path.join(distDir, 'index.html')).then(() => true).catch(() => false);
-        expect(indexExists).toBe(true);
+            // Check that index.html exists
+            const indexExists = await Deno.stat(path.join(distDir, 'index.html')).then(() => true).catch(() => false);
+            assertEquals(indexExists, true);
 
-        // Check that about.html exists (should NOT be renamed)
-        const aboutExists = await fs.stat(path.join(distDir, 'about.html')).then(() => true).catch(() => false);
-        expect(aboutExists).toBe(true);
+            // Check that about.html exists (should NOT be renamed)
+            const aboutExists = await Deno.stat(path.join(distDir, 'about.html')).then(() => true).catch(() => false);
+            assertEquals(aboutExists, true);
 
-        // Check that JS file IS renamed
-        const files = await fs.readdir(distDir, { recursive: true });
-        const jsFiles = files.filter(f => typeof f === 'string' && f.endsWith('.js'));
-        expect(jsFiles.length).toBeGreaterThan(0);
-        const jsBasename = path.basename(jsFiles[0] as string);
-        expect(jsBasename).toMatch(/^bafkrei/);
-    });
+            // Check that JS file IS renamed
+            const files = [];
+            for await (const name of walkDir(distDir)) {
+                files.push(name);
+            }
+            const jsFiles = files.filter(f => f.endsWith('.js'));
+            assert(jsFiles.length > 0);
+            const jsBasename = path.basename(jsFiles[0]);
+            assertMatch(jsBasename, /^bafkrei/);
+        } finally {
+            await Deno.remove(tempDir, { recursive: true }).catch(() => {});
+        }
+    },
 });
