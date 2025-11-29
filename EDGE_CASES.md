@@ -4,7 +4,8 @@
 
 1. **Source Maps**
    - `.map` files are renamed to their CIDs
-   - `sourceMappingURL` comments in JS/CSS files are updated to reference the new CID-based map filenames
+   - `sourceMappingURL` comments in JS/CSS files are updated to reference the
+     new CID-based map filenames
    - Tested in `edge-cases.test.ts`
 
 2. **Manifest Files**
@@ -36,13 +37,16 @@
 
 8. **HTML Entry Point Handling**
    - All `.html` files are explicitly NOT renamed to a CID
-   - This ensures compatibility with standard web servers, `vite preview`, and MPA setups
-   - References *within* HTML files are still updated to point to CID-named assets
+   - This ensures compatibility with standard web servers, `vite preview`, and
+     MPA setups
+   - References _within_ HTML files are still updated to point to CID-named
+     assets
 
 ## 📝 Known Limitations
 
 1. **Dynamic Imports with Variables**
-   - Dynamic imports like `import(\`./\${variable}.js\`)` cannot be statically analyzed
+   - Dynamic imports like `import(\`./\${variable}.js\`)` cannot be statically
+     analyzed
    - These will not have their references updated
    - This is a fundamental limitation of static analysis
 
@@ -57,6 +61,7 @@
 ## 🔧 Configuration Options
 
 Users can control behavior with Vite config:
+
 - `build.assetsInlineLimit`: Control when assets are inlined vs. output as files
 - `build.sourcemap`: Enable/disable source map generation
 - `build.manifest`: Enable/disable manifest generation

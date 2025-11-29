@@ -1,7 +1,7 @@
-import { CID } from 'multiformats/cid';
-import * as raw from 'multiformats/codecs/raw';
-import { sha256 } from 'multiformats/hashes/sha2';
-import { base32 } from 'multiformats/bases/base32';
+import { CID } from "multiformats/cid";
+import * as raw from "multiformats/codecs/raw";
+import { sha256 } from "multiformats/hashes/sha2";
+import { base32 } from "multiformats/bases/base32";
 
 /**
  * Generates a Content Identifier (CID) for the given content.
@@ -51,13 +51,15 @@ import { base32 } from 'multiformats/bases/base32';
  *
  * @public
  */
-export async function generateCID(content: string | Uint8Array): Promise<string> {
-    const bytes = typeof content === 'string'
-        ? new TextEncoder().encode(content)
-        : content;
+export async function generateCID(
+	content: string | Uint8Array,
+): Promise<string> {
+	const bytes = typeof content === "string"
+		? new TextEncoder().encode(content)
+		: content;
 
-    const hash = await sha256.digest(bytes);
-    const cid = CID.create(1, raw.code, hash);
+	const hash = await sha256.digest(bytes);
+	const cid = CID.create(1, raw.code, hash);
 
-    return cid.toString(base32);
+	return cid.toString(base32);
 }

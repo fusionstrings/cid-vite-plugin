@@ -7,6 +7,7 @@ This project uses Deno and publishes to JSR (JavaScript Registry).
 ### Automatic (Recommended)
 
 1. Create a version tag:
+
 ```bash
 git tag v0.0.2
 git push origin v0.0.2
@@ -27,7 +28,8 @@ deno publish            # Publish to JSR
 
 ## Documentation Deployment
 
-Documentation is automatically generated using `deno doc` and deployed to GitHub Pages on every push to main.
+Documentation is automatically generated using `deno doc` and deployed to GitHub
+Pages on every push to main.
 
 ### Manual Documentation Generation
 
@@ -42,16 +44,19 @@ deno run --allow-net --allow-read https://deno.land/std/http/file_server.ts docs
 ## Using the Package
 
 ### From JSR (Deno)
+
 ```typescript
 import { cidVitePlugin } from "jsr:@fusionstrings/cid-vite-plugin";
 ```
 
 ### From JSR (Node.js)
+
 ```bash
 npx jsr add @fusionstrings/cid-vite-plugin
 ```
 
 Then in your code:
+
 ```typescript
 import { cidVitePlugin } from "@fusionstrings/cid-vite-plugin";
 ```
@@ -59,14 +64,17 @@ import { cidVitePlugin } from "@fusionstrings/cid-vite-plugin";
 ## CI/CD Workflows
 
 ### 1. CI (Pull Requests & Main Branch)
+
 - Runs on every push and PR
 - Checks: formatting, linting, type checking, tests
 
 ### 2. Publish to JSR
+
 - Runs on version tags (`v*`)
 - Publishes package to JSR
 
 ### 3. Deploy Documentation
+
 - Runs on pushes to main branch
 - Generates and deploys docs to GitHub Pages
 
@@ -115,9 +123,11 @@ vite build
 ## Setup Requirements
 
 ### For JSR Publishing
+
 No secrets needed - JSR uses OIDC tokens from GitHub Actions.
 
 ### For GitHub Pages
+
 1. Go to repository Settings → Pages
 2. Set Source to "GitHub Actions"
 3. Push to main to trigger deployment
@@ -129,6 +139,7 @@ No secrets needed - JSR uses OIDC tokens from GitHub Actions.
 **When:** On GitHub releases or manually
 
 **How:**
+
 ```bash
 # Local testing
 npm run build
@@ -142,6 +153,7 @@ npm pack
 ```
 
 **Manual publish:**
+
 ```bash
 npm version patch|minor|major
 git push --follow-tags
@@ -154,14 +166,15 @@ npm publish
 
 **When:** On every push to main branch
 
-**How:**
-The GitHub Action automatically:
+**How:** The GitHub Action automatically:
+
 1. Builds the library
 2. Generates API docs from TSDoc
 3. Builds VitePress site
 4. Deploys to GitHub Pages
 
 **Manual deployment:**
+
 ```bash
 npm run docs:build
 # Deploy .vitepress/dist to your hosting provider
@@ -170,6 +183,7 @@ npm run docs:build
 ## Alternative Hosting Options
 
 ### Vercel
+
 ```bash
 # Install Vercel CLI
 npm i -g vercel
@@ -180,6 +194,7 @@ vercel --prod .vitepress/dist
 ```
 
 ### Netlify
+
 ```bash
 # netlify.toml
 [build]
@@ -188,6 +203,7 @@ vercel --prod .vitepress/dist
 ```
 
 ### Cloudflare Pages
+
 ```bash
 # Build command: npm run docs:build
 # Build output directory: .vitepress/dist
@@ -196,11 +212,13 @@ vercel --prod .vitepress/dist
 ## Setup Requirements
 
 ### For NPM Publishing
+
 1. Create an NPM account
 2. Generate an access token with publish permissions
 3. Add `NPM_TOKEN` secret to GitHub repository
 
 ### For GitHub Pages
+
 1. Go to repository Settings → Pages
 2. Set Source to "GitHub Actions"
 3. Push to main branch to trigger deployment

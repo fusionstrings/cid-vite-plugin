@@ -1,2 +1,2 @@
-export const vendorName = 'Vendor Module';
-console.log('Vendor module loaded');
+export const vendorName = "Vendor Module";
+console.log("Vendor module loaded");

@@ -1,17 +1,24 @@
 # CID Vite Plugin
 
-A Vite plugin that uses Content Identifiers (CID) as hashes for build assets, enabling true content-addressed immutable builds perfect for decentralized web deployment.
+A Vite plugin that uses Content Identifiers (CID) as hashes for build assets,
+enabling true content-addressed immutable builds perfect for decentralized web
+deployment.
 
 [![JSR](https://jsr.io/badges/@fusionstrings/cid-vite-plugin)](https://jsr.io/@fusionstrings/cid-vite-plugin)
 [![JSR Score](https://jsr.io/badges/@fusionstrings/cid-vite-plugin/score)](https://jsr.io/@fusionstrings/cid-vite-plugin)
 
 ## Features
 
-- 🔒 **Content Addressed**: Files are named by their content hash (CID), ensuring true immutability
-- ⚡️ **Vite Powered**: Seamless integration with Vite's build pipeline and development server
-- 📦 **IPFS Ready**: Perfect for deploying to IPFS, Arweave, or any content-addressed storage
-- 🔄 **Automatic Updates**: All references to renamed files are automatically updated
-- 📝 **Manifest Support**: Generates updated manifest files with CID-based filenames
+- 🔒 **Content Addressed**: Files are named by their content hash (CID),
+  ensuring true immutability
+- ⚡️ **Vite Powered**: Seamless integration with Vite's build pipeline and
+  development server
+- 📦 **IPFS Ready**: Perfect for deploying to IPFS, Arweave, or any
+  content-addressed storage
+- 🔄 **Automatic Updates**: All references to renamed files are automatically
+  updated
+- 📝 **Manifest Support**: Generates updated manifest files with CID-based
+  filenames
 - 🎯 **TypeScript**: Written in TypeScript with full type definitions
 
 ## Installation
@@ -40,17 +47,17 @@ yarn dlx jsr add @fusionstrings/cid-vite-plugin
 Add the plugin to your `vite.config.ts`:
 
 ```typescript
-import { defineConfig } from 'vite';
-import { cidVitePlugin } from '@fusionstrings/cid-vite-plugin';
+import { defineConfig } from "vite";
+import { cidVitePlugin } from "@fusionstrings/cid-vite-plugin";
 
 export default defineConfig({
-  plugins: [
-    cidVitePlugin(),
-  ],
-  build: {
-    manifest: true, // Optional: Generate manifest file
-    modulePreload: true, // Optional: Enable module preloading
-  },
+	plugins: [
+		cidVitePlugin(),
+	],
+	build: {
+		manifest: true, // Optional: Generate manifest file
+		modulePreload: true, // Optional: Enable module preloading
+	},
 });
 ```
 
@@ -68,11 +75,13 @@ export default defineConfig({
 
 ## Configuration
 
-The plugin works out of the box with no configuration required. Simply add it to your Vite plugins array.
+The plugin works out of the box with no configuration required. Simply add it to
+your Vite plugins array.
 
 ## Example Output
 
 Before:
+
 ```
 dist/
   assets/
@@ -81,6 +90,7 @@ dist/
 ```
 
 After:
+
 ```
 dist/
   assets/
@@ -90,7 +100,9 @@ dist/
 
 ## Multi-Page Applications
 
-The plugin supports Multi-Page Applications (MPA) by preserving HTML entry point filenames. This ensures that web servers can properly serve the application while all asset files use CID-based naming.
+The plugin supports Multi-Page Applications (MPA) by preserving HTML entry point
+filenames. This ensures that web servers can properly serve the application
+while all asset files use CID-based naming.
 
 ## Development
 
