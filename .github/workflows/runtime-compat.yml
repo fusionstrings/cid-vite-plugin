@@ -41,6 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm init -y
+          npm pkg set type=module
           npm install vite rollup multiformats
           npx jsr add @std/path
 
@@ -89,20 +90,39 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bunx jsr add @fusionstrings/vite-plugin-cid
+        run: |
+          bun install vite rollup multiformats
+          bun add @std/path
 
       - name: Create test file
         run: |
           cat > test-bun.ts << 'EOF'
-          import { cid } from '@fusionstrings/vite-plugin-cid';
+          import { generateCID } from '@fusionstrings/vite-plugin-cid/cid';
+          import { cid } from './src/index.ts';
 
-          const plugin = cid();
-          if (!plugin || typeof plugin.name !== 'string') {
-            console.error('Plugin creation failed');
+          // Test CID generation
+          try {
+            const testCid = await generateCID('Hello, Bun!');
+            if (!testCid || !testCid.startsWith('bafkrei')) {
+              throw new Error('CID generation failed');
+            }
+            console.log('✓ CID generation successful:', testCid);
+          } catch (err) {
+            console.error('✗ CID generation failed:', (err as Error).message);
             process.exit(1);
           }
-          console.log('✓ Plugin created successfully:', plugin.name);
-          process.exit(0);
+
+          // Test plugin creation
+          try {
+            const plugin = cid();
+            if (!plugin || typeof plugin.name !== 'string') {
+              throw new Error('Plugin creation failed');
+            }
+            console.log('✓ Plugin created successfully:', plugin.name);
+          } catch (err) {
+            console.error('✗ Plugin creation failed:', (err as Error).message);
+            process.exit(1);
+          }
           EOF
 
       - name: Run test
@@ -124,21 +144,23 @@ jobs:
         run: npm install -g wrangler
 
       - name: Install dependencies
-        run: npx jsr add @fusionstrings/vite-plugin-cid
+        run: |
+          npm init -y
+          npm install multiformats @std/path
 
       - name: Create worker test
         run: |
           cat > wrangler.toml << 'EOF'
           name = "vite-plugin-cid-test"
-          main = "worker.mjs"
+          main = "worker.ts"
           compatibility_date = "2024-11-30"
           EOF
 
-          cat > worker.mjs << 'EOF'
+          cat > worker.ts << 'EOF'
           import { generateCID } from '@fusionstrings/vite-plugin-cid/cid';
 
           export default {
-            async fetch(request, env, ctx) {
+            async fetch(request: Request, env: any, ctx: any) {
               try {
                 const cid = await generateCID('Hello, Cloudflare Workers!');
                 if (!cid || !cid.startsWith('bafkrei')) {
@@ -146,7 +168,7 @@ jobs:
                 }
                 return new Response('✓ CID generation successful: ' + cid, { status: 200 });
               } catch (err) {
-                return new Response('✗ Error: ' + err.message, { status: 500 });
+                return new Response('✗ Error: ' + (err as Error).message, { status: 500 });
               }
             }
           };
@@ -154,8 +176,8 @@ jobs:
 
       - name: Test worker locally
         run: |
-          timeout 10s wrangler dev --local --test-scheduled &
-          sleep 5
+          timeout 20s wrangler dev --local --test-scheduled &
+          sleep 10
           response=$(curl -s http://localhost:8787 || echo "✗ Failed to connect")
           echo "$response"
           if [[ "$response" == *"✓"* ]]; then
@@ -184,7 +206,9 @@ jobs:
           npx playwright install chromium firefox webkit
 
       - name: Install dependencies
-        run: npx jsr add @fusionstrings/vite-plugin-cid vite
+        run: |
+          npm install vite rollup multiformats
+          npx jsr add @std/path
 
       - name: Create browser test
         run: |
@@ -196,12 +220,12 @@ jobs:
           <head><title>Browser Test</title></head>
           <body>
             <div id="result">Testing...</div>
-            <script type="module" src="/main.js"></script>
+            <script type="module" src="/main.ts"></script>
           </body>
           </html>
           EOF
 
-          cat > test-browser/main.js << 'EOF'
+          cat > test-browser/main.ts << 'EOF'
           import { generateCID } from '@fusionstrings/vite-plugin-cid/cid';
 
           async function test() {
@@ -211,22 +235,27 @@ jobs:
                 throw new Error('CID generation failed');
               }
               document.getElementById('result').textContent = '✓ CID generation successful: ' + cid;
-              window.testPassed = true;
+              (window as any).testPassed = true;
             } catch (err) {
-              document.getElementById('result').textContent = '✗ Error: ' + err.message;
-              window.testPassed = false;
+              document.getElementById('result').textContent = '✗ Error: ' + (err as Error).message;
+              (window as any).testPassed = false;
             }
           }
 
           test();
           EOF
 
-          cat > test-browser/vite.config.js << 'EOF'
+          cat > test-browser/vite.config.ts << 'EOF'
           import { defineConfig } from 'vite';
 
           export default defineConfig({
             root: '.',
-            server: { port: 3000 }
+            server: { port: 3000 },
+            resolve: {
+              alias: {
+                '@std/path': 'https://esm.sh/@std/path@1.0.8'
+              }
+            }
           });
           EOF
 

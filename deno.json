@@ -1,7 +1,10 @@
 {
 	"name": "@fusionstrings/vite-plugin-cid",
 	"version": "0.0.1",
-	"exports": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./cid": "./src/cid.ts"
+	},
 	"license": "MIT",
 	"tasks": {
 		"dev": "cd playground && deno run --watch -A npm:vite@7.2.4 build --watch",
