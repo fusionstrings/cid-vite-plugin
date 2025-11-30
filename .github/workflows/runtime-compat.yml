@@ -92,7 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           bun install vite rollup multiformats
-          bun add jsr:@std/path
+          bun x jsr add @std/path
 
       - name: Create test file
         run: |
@@ -146,7 +146,8 @@ jobs:
       - name: Install dependencies
         run: |
           npm init -y
-          npm install multiformats @std/path
+          npm install multiformats
+          npx jsr add @std/path
 
       - name: Create worker test
         run: |
@@ -253,7 +254,9 @@ jobs:
             server: { port: 3000 },
             resolve: {
               alias: {
-                '@std/path': 'https://esm.sh/@std/path@1.0.8'
+                '@std/path': 'https://esm.sh/@std/path@1.0.8',
+                '@fusionstrings/vite-plugin-cid/cid': '../src/cid.ts',
+                '@fusionstrings/vite-plugin-cid': '../src/index.ts'
               }
             }
           });
