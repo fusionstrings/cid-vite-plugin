@@ -92,7 +92,7 @@ jobs:
       - name: Install dependencies
         run: |
           bun install vite rollup multiformats
-          bun add @std/path
+          bun add jsr:@std/path
 
       - name: Create test file
         run: |
