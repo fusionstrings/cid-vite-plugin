@@ -1,0 +1,271 @@
+name: Runtime Compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deno:
+    name: Deno
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run tests
+        run: deno task test
+
+  node:
+    name: Node.js
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npx jsr add @fusionstrings/vite-plugin-cid
+
+      - name: Create test file
+        run: |
+          cat > test-node.mjs << 'EOF'
+          import { cid } from '@fusionstrings/vite-plugin-cid';
+          import { createServer } from 'vite';
+
+          const plugin = cid();
+          if (!plugin || typeof plugin.name !== 'string') {
+            console.error('Plugin creation failed');
+            process.exit(1);
+          }
+          console.log('✓ Plugin created successfully:', plugin.name);
+
+          // Test with Vite server
+          try {
+            const server = await createServer({
+              plugins: [plugin],
+              logLevel: 'silent'
+            });
+            await server.close();
+            console.log('✓ Vite integration successful');
+          } catch (err) {
+            console.error('✗ Vite integration failed:', err.message);
+            process.exit(1);
+          }
+          EOF
+
+      - name: Run test
+        run: node test-node.mjs
+
+  bun:
+    name: Bun
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bunx jsr add @fusionstrings/vite-plugin-cid
+
+      - name: Create test file
+        run: |
+          cat > test-bun.ts << 'EOF'
+          import { cid } from '@fusionstrings/vite-plugin-cid';
+
+          const plugin = cid();
+          if (!plugin || typeof plugin.name !== 'string') {
+            console.error('Plugin creation failed');
+            process.exit(1);
+          }
+          console.log('✓ Plugin created successfully:', plugin.name);
+          process.exit(0);
+          EOF
+
+      - name: Run test
+        run: bun run test-bun.ts
+
+  cloudflare:
+    name: Cloudflare Workers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Install dependencies
+        run: npx jsr add @fusionstrings/vite-plugin-cid
+
+      - name: Create worker test
+        run: |
+          cat > wrangler.toml << 'EOF'
+          name = "vite-plugin-cid-test"
+          main = "worker.mjs"
+          compatibility_date = "2024-11-30"
+          EOF
+
+          cat > worker.mjs << 'EOF'
+          import { generateCID } from '@fusionstrings/vite-plugin-cid/cid';
+
+          export default {
+            async fetch(request, env, ctx) {
+              try {
+                const cid = await generateCID('Hello, Cloudflare Workers!');
+                if (!cid || !cid.startsWith('bafkrei')) {
+                  throw new Error('CID generation failed');
+                }
+                return new Response('✓ CID generation successful: ' + cid, { status: 200 });
+              } catch (err) {
+                return new Response('✗ Error: ' + err.message, { status: 500 });
+              }
+            }
+          };
+          EOF
+
+      - name: Test worker locally
+        run: |
+          timeout 10s wrangler dev --local --test-scheduled &
+          sleep 5
+          response=$(curl -s http://localhost:8787 || echo "✗ Failed to connect")
+          echo "$response"
+          if [[ "$response" == *"✓"* ]]; then
+            echo "Worker test passed"
+            exit 0
+          else
+            echo "Worker test failed"
+            exit 1
+          fi
+
+  browser:
+    name: Browser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Playwright
+        run: |
+          npm install -D playwright @playwright/test
+          npx playwright install chromium firefox webkit
+
+      - name: Install dependencies
+        run: npx jsr add @fusionstrings/vite-plugin-cid vite
+
+      - name: Create browser test
+        run: |
+          mkdir -p test-browser
+
+          cat > test-browser/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>Browser Test</title></head>
+          <body>
+            <div id="result">Testing...</div>
+            <script type="module" src="/main.js"></script>
+          </body>
+          </html>
+          EOF
+
+          cat > test-browser/main.js << 'EOF'
+          import { generateCID } from '@fusionstrings/vite-plugin-cid/cid';
+
+          async function test() {
+            try {
+              const cid = await generateCID('Hello, Browser!');
+              if (!cid || !cid.startsWith('bafkrei')) {
+                throw new Error('CID generation failed');
+              }
+              document.getElementById('result').textContent = '✓ CID generation successful: ' + cid;
+              window.testPassed = true;
+            } catch (err) {
+              document.getElementById('result').textContent = '✗ Error: ' + err.message;
+              window.testPassed = false;
+            }
+          }
+
+          test();
+          EOF
+
+          cat > test-browser/vite.config.js << 'EOF'
+          import { defineConfig } from 'vite';
+
+          export default defineConfig({
+            root: '.',
+            server: { port: 3000 }
+          });
+          EOF
+
+          cat > playwright.config.js << 'EOF'
+          export default {
+            testDir: './tests',
+            timeout: 30000,
+            use: {
+              baseURL: 'http://localhost:3000',
+            },
+            webServer: {
+              command: 'npx vite test-browser --port 3000',
+              port: 3000,
+              reuseExistingServer: false,
+            },
+          };
+          EOF
+
+          mkdir -p tests
+          cat > tests/browser.spec.js << 'EOF'
+          import { test, expect } from '@playwright/test';
+
+          test('CID generation in browser', async ({ page }) => {
+            await page.goto('/');
+            await page.waitForFunction(() => window.testPassed !== undefined, { timeout: 10000 });
+            const passed = await page.evaluate(() => window.testPassed);
+            expect(passed).toBe(true);
+            const result = await page.textContent('#result');
+            expect(result).toContain('✓');
+          });
+          EOF
+
+      - name: Run browser tests
+        run: npx playwright test
+
+  summary:
+    name: Runtime Compatibility Summary
+    needs: [deno, node, bun, cloudflare, browser]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "## Runtime Compatibility Test Results"
+          echo "- Deno: ${{ needs.deno.result }}"
+          echo "- Node.js: ${{ needs.node.result }}"
+          echo "- Bun: ${{ needs.bun.result }}"
+          echo "- Cloudflare Workers: ${{ needs.cloudflare.result }}"
+          echo "- Browser: ${{ needs.browser.result }}"

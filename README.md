@@ -6,6 +6,9 @@ deployment.
 
 [![JSR](https://jsr.io/badges/@fusionstrings/vite-plugin-cid)](https://jsr.io/@fusionstrings/vite-plugin-cid)
 [![JSR Score](https://jsr.io/badges/@fusionstrings/vite-plugin-cid/score)](https://jsr.io/@fusionstrings/vite-plugin-cid)
+[![Runtime Compatibility](https://github.com/fusionstrings/vite-plugin-cid/actions/workflows/runtime-compat.yml/badge.svg)](https://github.com/fusionstrings/vite-plugin-cid/actions/workflows/runtime-compat.yml)
+
+**Tested Runtimes:** Deno • Node.js • Bun • Cloudflare Workers • Browsers
 
 ## Features
 
