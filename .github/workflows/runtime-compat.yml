@@ -39,11 +39,14 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: npm install multiformats vite rollup
+        run: |
+          npm init -y
+          npm install vite rollup multiformats
+          npx jsr add @std/path
 
       - name: Create test file
         run: |
-          cat > test-node.mjs << 'EOF'
+          cat > test-node.ts << 'EOF'
           import { generateCID } from './src/cid.ts';
           import { cid } from './src/index.ts';
 
@@ -55,7 +58,7 @@ jobs:
             }
             console.log('✓ CID generation successful:', testCid);
           } catch (err) {
-            console.error('✗ CID generation failed:', err.message);
+            console.error('✗ CID generation failed:', (err as Error).message);
             process.exit(1);
           }
 
@@ -67,13 +70,13 @@ jobs:
             }
             console.log('✓ Plugin created successfully:', plugin.name);
           } catch (err) {
-            console.error('✗ Plugin creation failed:', err.message);
+            console.error('✗ Plugin creation failed:', (err as Error).message);
             process.exit(1);
           }
           EOF
 
       - name: Run test
-        run: node --experimental-strip-types test-node.mjs
+        run: node --experimental-strip-types --experimental-transform-types test-node.ts
 
   bun:
     name: Bun
