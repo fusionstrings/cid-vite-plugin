@@ -5,6 +5,12 @@
 		".": "./src/index.ts",
 		"./cid": "./src/cid.ts"
 	},
+	"compilerOptions": {
+		"lib": [
+			"dom",
+			"esnext"
+		]
+	},
 	"license": "MIT",
 	"tasks": {
 		"dev": "cd playground && deno run --watch -A npm:vite@7.2.4 build --watch",
