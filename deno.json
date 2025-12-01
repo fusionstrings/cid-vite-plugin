@@ -1,6 +1,6 @@
 {
 	"name": "@fusionstrings/vite-plugin-cid",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"exports": {
 		".": "./src/index.ts",
 		"./cid": "./src/cid.ts"
@@ -10,8 +10,8 @@
 		"dev": "cd playground && deno run --watch -A npm:vite@7.2.4 build --watch",
 		"build": "cd playground && deno run -A npm:vite@7.2.4 build",
 		"test": "deno test --allow-read --allow-write --allow-env --allow-ffi --allow-run --allow-sys",
-		"check": "deno check src/**/*.ts",
-		"lint": "deno lint src/",
+		"check": "deno check",
+		"lint": "deno lint",
 		"fmt": "deno fmt",
 		"fmt:check": "deno fmt --check",
 		"docs": "deno doc --html --name='CID Vite Plugin' --output=./docs ./src/index.ts ./src/cid.ts"
