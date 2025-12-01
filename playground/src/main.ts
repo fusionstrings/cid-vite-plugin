@@ -17,7 +17,8 @@ async function main() {
 			const cidMatch = src.match(/bafkrei[a-z0-9]+/);
 			if (cidMatch) {
 				display.innerHTML +=
-					`<br><br><span style="color: #4ade80">✓ Verified CID: ${cidMatch[0]
+					`<br><br><span style="color: #4ade80">✓ Verified CID: ${
+						cidMatch[0]
 					}</span>`;
 			}
 		}
